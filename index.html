@@ -1,0 +1,484 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>GroupDiscussion Voice</title>
+    <link rel="manifest" href="/static/manifest.json">
+    <meta name="theme-color" content="#1a1a1a">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <style>
+        body { font-family: Arial, sans-serif; max-width: 1200px; margin: 20px auto; padding: 20px; background: #f5f5f5; }
+        h1 { text-align: center; color: #4CAF50; }
+
+        /* WELCOME SCREEN */
+        #welcome-screen { display: flex; justify-content: center; align-items: center; min-height: 80vh; }
+        .welcome-box { background: white; padding: 40px; border-radius: 16px; box-shadow: 0 4px 20px rgba(0,0,0,0.1); width: 500px; text-align: center; }
+        .welcome-box input,.welcome-box select { width: 90%; padding: 12px; margin: 10px 0; font-size: 16px; border: 1px solid #ddd; border-radius: 8px; }
+        .welcome-box button { width: 95%; padding: 14px; font-size: 18px; background: #4CAF50; color: white; border: none; border-radius: 8px; cursor: pointer; margin-top: 10px; }
+        .welcome-box button:hover { background: #45a049; }
+
+        /* DISCUSSION SCREEN */
+        #discussion-screen { display: none; }
+        #status { text-align: center; font-size: 24px !important; font-weight: 800 !important;color: blue !important;background: #e8f5e9 !important;padding: 18px !important;border-radius: 12px !important;margin: 20px 0 !important;border: 2px solid #4CAF50 !important;}
+        .participants-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 30px; margin-bottom: 20px; }
+        .participant-card { background: white; padding: 30px 20px; border-radius: 16px; text-align: center; box-shadow: 0 4px 12px rgba(0,0,0,0.1); border: 3px solid transparent; min-height: 420px; }
+        .participant-card.active { border-color: #4CAF50; box-shadow: 0 0 20px rgba(76, 175, 80, 0.4); transform: scale(1.02); }
+        
+        .avatar-wrapper { position: relative; display: inline-block; margin-bottom: 10px; }
+        .avatar { width: 155px; height: 150px; border-radius: 50%; object-fit: cover; object-position: top center; }
+        #user-video { 
+            width: 150px;
+            height: 150px;
+            border-radius: 50%;
+            object-fit: cover;
+            display: none;
+            margin: 0 auto 10px auto;
+        }
+        .avatar.emoji { font-size: 80px; display: flex; align-items: center; justify-content: center; background: #e0e0e0; }
+        .mouth { position: absolute; top: 65px; left: 50%; transform: translateX(-50%); width: 16px; height: 8px; background: #fff; border-radius: 50%; transition: all 0.1s; opacity: 0; z-index: 10; box-shadow: 0 1px 0 rgba(0,0,0,0.3); }
+        .participant-card:nth-child(1) .mouth { background-color: #faf0e6;left: 49%!important;border: 1px solid #d98a8a !important;border-radius: 50% !important; top: 63px; }
+        .participant-card:nth-child(2) .mouth {background-color: #faf0e6;width: 25px !important;border: 1px solid #d98a8a !important;border-radius: 50% !important;top: 69px !important;}
+        .mouth.talking { width: 18px; height: 6px; opacity: 1; animation: talk 0.6s infinite; }
+        @keyframes talk { 0%, 100% { width: 16px; height: 4px; } 50% { width: 18px; height: 12px; }}
+        .notes { background: #f9f9f9; padding: 15px; border-radius: 10px; min-height: 150px; font-size: 15px; color: #333; text-align: left; overflow-y: auto; }
+        #controls { background: white; padding: 20px; border-radius: 12px; text-align: center; }
+        button { padding: 10px 20px; font-size: 16px; cursor: pointer; background: #4CAF50; color: white; border: none; border-radius: 8px; }
+        button:disabled { background: #ccc; cursor: not-allowed; }
+        .srikar-controls { margin-top: 10px; }
+        .srikar-controls button { margin: 5px; }
+        /* CLAP ANIMATION */
+        .clap {
+            position: fixed !important;
+            bottom: -1px;
+            font-size: 50px !important;
+            animation: clapRise 12s linear forwards; /* changed to linear for smooth scroll */
+            z-index: 9999;
+            pointer-events: none;
+        }
+        @keyframes clapRise {
+            0% { transform: translateY(0) scale(0.5); opacity: 1; }
+            100% { transform: translateY(-100vh) scale(1); opacity: 0; }
+        }
+
+        /* PULSE EFFECT FOR STATUS */
+        #status.done {
+            animation: pulse 1s ease-in-out 3;
+        }
+        @keyframes pulse {
+            0%, 100% { transform: scale(1); }
+            50% { transform: scale(1.05); background: #c8e6c9 !important; }
+        }
+    /* ZOOM STYLE BUTTONS */
+        .zoom-btn {
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        padding: 10px 18px;
+        border: none;
+        border-radius: 8px;
+        font-size: 15px;
+        font-weight: 600;
+        cursor: pointer;
+        transition: all 0.2s;
+        font-family: Arial, sans-serif;
+        }
+
+        .zoom-btn.video-on {
+        background-color: #2D8C55; /* Zoom green */
+        color: white;
+        }
+        .zoom-btn.video-on:hover {
+        background-color: #247048;
+        }
+
+        .zoom-btn.video-off {
+        background-color: #E84545; /* Zoom red */
+        color: white;
+        }
+        .zoom-btn.video-off:hover {
+        background-color: #C33A3A;
+        }
+        .zoom-btn.mic-on { 
+        background-color: #2D8C55; /* Zoom green */
+        color: white; 
+        }
+        .zoom-btn.mic-on:hover { 
+        background-color: #247048; 
+        }
+
+        .zoom-btn.mic-off { 
+        background-color: #E84545; /* Zoom red */
+        color: white; 
+        }
+        .zoom-btn.mic-off:hover { 
+        background-color: #C33A3A; 
+        }
+
+        .zoom-btn svg {
+        flex-shrink: 0;
+        }
+        </style>
+</head>
+<body>
+
+    <!-- SCREEN 1: WELCOME -->
+    <div id="welcome-screen">
+        <div class="welcome-box">
+            <h1>Group Discussion</h1>
+            <p>Enter names to begin</p>
+
+            <input type="text" id="name1-input" placeholder="First Avatar Name" >
+            <input type="text" id="name2-input" placeholder="Second Avatar Name" >
+            <input type="text" id="name3-input" placeholder="Your Name" value="Srikar">
+
+            <input type="text" id="topic-input" placeholder="Enter discussion topic...">
+
+            <select id="level-select">
+                <option value="grade_1_3">Grade 1-3</option>
+                <option value="grade_4_6" selected>Grade 4-6</option>
+                <option value="grade_7_10">Grade 7-10</option>
+                <option value="grade_11_plus">Grade 11+</option>
+            </select>
+
+            <button onclick="goToDiscussion()">Start Discussion</button>
+        </div>
+    </div>
+
+    <!-- SCREEN 2: DISCUSSION -->
+    <div id="discussion-screen">
+        <h1>Group Discussion:  <span id="topic-display"></span></h1>
+        <div id="status">Round: - | Next: -</div>
+
+        <div class="participants-grid">
+            <div class="participant-card" id="card-avatar1">
+                <div class="avatar-wrapper">
+                    <img src="/static/avatar1.jpeg" class="avatar" alt="avatar1">
+                    <div class="mouth"></div>
+                </div>
+                <h3 id="name-label-avatar1">Avatar 1</h3>
+                <div class="notes" id="notes-avatar1">Waiting to start...</div>
+            </div>
+
+            <div class="participant-card" id="card-avatar2">
+                <div class="avatar-wrapper">
+                    <img src="/static/avatar2.jpeg" class="avatar" alt="avatar2">
+                    <div class="mouth"></div>
+                </div>
+                <h3 id="name-label-avatar2">Avatar 2</h3>
+                <div class="notes" id="notes-avatar2">Waiting to start...</div>
+            </div>
+
+            <div class="participant-card" id="card-user">
+                <div class="avatar-wrapper">
+                    <video id="user-video" autoplay muted playsinline></video>
+                    <div class="avatar emoji" id="user-avatar">👤</div>
+                    <div class="mouth"></div>
+                </div>
+                <h3 id="name-label-user">You</h3>
+                <div class="notes" id="notes-user">Your turn will appear here</div>
+                <div class="srikar-controls" id="user-input" style="display:none;">
+                        <button id="camera-btn" class="zoom-btn video-off" onclick="toggleCamera()" title="Toggle Video">
+                            <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
+                            <rect x="1" y="5" width="15" height="14" rx="2" stroke="white" stroke-width="2"/>
+                            <path d="M23 7l-7 5 7 5V7z" stroke="white" stroke-width="2" stroke-linejoin="round"/>
+                            <line x1="1" y1="1" x2="23" y2="23" stroke="white" stroke-width="2"/>
+                            </svg>
+                        </button>
+
+                        <button id="mic-btn" class="zoom-btn mic-off" onclick="toggleMic()" title="Toggle Mic">
+                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
+                        <path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z" stroke="white" stroke-width="2"/>
+                        <path d="M19 10v2a7 7 0 0 1-14 0v-2" stroke="white" stroke-width="2"/>
+                        <line x1="12" y1="19" x2="12" y2="23" stroke="white" stroke-width="2"/>
+                        <line x1="8" y1="23" x2="16" y2="23" stroke="white" stroke-width="2"/>
+                        <line x1="1" y1="1" x2="23" y2="23" stroke="white" stroke-width="2"/> <!-- ADD THIS SLASH -->
+                        </svg>
+                        </button>
+                    </div>
+                        </div>
+                        </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <audio id="audio-player"></audio>
+
+    <script>
+        let currentRound = 0;
+        let audioPlayer = document.getElementById('audio-player');
+        let discussionLevel = 'grade_4_6';
+        let userStream = null;
+        let recognition = null;
+        let isRecording = false;
+        let cameraOn = false;
+        let micOn = false;
+        let NAMES = {};
+        let TOPIC = "";
+        let finalTranscript = "";
+
+        const GRADE_SETTINGS = {
+            "grade_1_3": { max_words: 20 },
+            "grade_4_6": { max_words: 30 },
+            "grade_7_10": { max_words: 50 },
+            "grade_11_plus": { max_words: 50 }
+        };
+
+        function goToDiscussion() {
+            // 1. Get data from welcome screen
+            NAMES.avatar1 = document.getElementById('name1-input').value.trim() || "Avatar 1";
+            NAMES.avatar2 = document.getElementById('name2-input').value.trim() || "Avatar 2";
+            NAMES.user = document.getElementById('name3-input').value.trim() || "You";
+            TOPIC = document.getElementById('topic-input').value.trim();
+            discussionLevel = document.getElementById('level-select').value;
+
+            if (!TOPIC) return alert('Please enter a topic');
+
+            // 2. Update UI labels
+            document.getElementById('name-label-avatar1').innerText = NAMES.avatar1;
+            document.getElementById('name-label-avatar2').innerText = NAMES.avatar2;
+            document.getElementById('name-label-user').innerText = NAMES.user;
+            document.getElementById('topic-display').innerText = TOPIC;
+
+            // 3. Switch screens
+            document.getElementById('welcome-screen').style.display = 'none';
+            document.getElementById('discussion-screen').style.display = 'block';
+            document.getElementById('notes-avatar1').innerHTML = '';
+            document.getElementById('notes-avatar2').innerHTML = '';
+            document.getElementById('notes-user').innerHTML = '';
+
+            // 4. Start the discussion
+            startDiscussion();
+        }
+
+        async function startDiscussion() {
+            const response = await fetch('/start', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({
+                    topic: TOPIC,
+                    level: discussionLevel,
+                    max_words: GRADE_SETTINGS[discussionLevel].max_words,
+                    name1: NAMES.avatar1,
+                    name2: NAMES.avatar2,
+                    name3: NAMES.user
+                })
+            });
+            const data = await response.json();
+            handleTurn(data);
+        }
+        function showClaps() {
+            // Make status box pulse
+            document.getElementById('status').classList.add('done');
+            
+            // Drop 20 clap emojis
+            for(let i = 0; i < 30; i++) {
+                setTimeout(() => {
+                    let clap = document.createElement('div');
+                    clap.className = 'clap';
+                    clap.innerText = '👏';
+                    clap.style.left = Math.random() * 100 + 'vw';
+                    clap.style.top = '-50px';
+                    clap.style.animationDelay = Math.random() * 0.5 + 's';
+                    document.body.appendChild(clap);
+                    
+                    // Remove it after animation
+                    setTimeout(() => clap.remove(), 2500);
+                }, i * 100);
+            }
+        }
+
+        async function handleTurn(data) {
+            if (data.round === "DONE") {
+                document.getElementById('status').innerText = data.message;
+                    showClaps();
+                    // SPEAK THE ENDING
+                    await playTTS(data.message, 'system'); 
+                    hideUserInput();
+                    setActiveSpeaker(null);
+                return;
+            }
+
+            currentRound = data.round;
+            updateStatus(data);
+            setActiveSpeaker(data.speaker);
+
+            if (data.speaker === 'user') {
+                // KEY CHANGE: DO NOT call fetchNextTurn. Wait for user
+                showUserInput(); // shows "Start Talking" + "Stop Talking" buttons
+                return; 
+            } else {
+                hideUserInput();
+                if (data.message) {
+                    updateNotes(data.speaker, data.message);
+                    await playTTS(data.message, data.speaker);
+                }
+                // Only avatars auto-advance
+                await new Promise(r => setTimeout(r, 800));
+                await fetchNextTurn(); // <-- ADD AWAIT
+            }
+        }
+
+        async function onStopTalkingClicked(userText) {
+            if(userText.trim() !== ""){
+                updateNotes('user', userText);
+                
+                // SEND YOUR MESSAGE TO BACKEND FIRST
+                const response = await fetch('/chat', {
+                    method: 'POST', 
+                    headers: {'Content-Type': 'application/json'}, 
+                    body: JSON.stringify({message: userText}) // <-- SEND REAL TEXT
+                });
+                const data = await response.json();
+                handleTurn(data); // handle the next speaker
+            }
+            hideUserInput();
+        }
+
+        async function fetchNextTurn() {
+            const response = await fetch('/next_turn', { method: 'GET' }); // <-- CHANGE 1: Use GET
+            const data = await response.json();
+            await handleTurn(data);
+        }
+
+        async function playTTS(text, speaker) {
+            if (!text) return;
+
+            // Don't try to animate mouth for system message
+            if (speaker !== 'system') {
+                setMouth(speaker, true);
+            }
+
+            const response = await fetch('/tts', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({text: text, speaker: speaker, level: discussionLevel})
+            });
+
+            const data = await response.json();
+            if (data.audio) {
+                audioPlayer.src = 'data:audio/mp3;base64,' + data.audio;
+                await audioPlayer.play();
+                await new Promise(resolve => { audioPlayer.onended = resolve; });
+            }
+
+            if (speaker !== 'system') {
+                setMouth(speaker, false);
+            }
+        }
+
+        function setActiveSpeaker(speaker) {
+            document.querySelectorAll('.participant-card').forEach(c => c.classList.remove('active'));
+            if (speaker!== 'system') document.getElementById(`card-${speaker}`).classList.add('active');
+        }
+
+        function setMouth(speaker, talking) {
+            const card = document.getElementById(`card-${speaker}`);
+            if(card) card.querySelector('.mouth').classList.toggle('talking', talking);
+        }
+
+        function updateNotes(speaker, text) {
+            const name = NAMES[speaker];
+            const notesDiv = document.getElementById(`notes-${speaker}`);
+            notesDiv.innerHTML += `<p><b>${name}:</b> ${text}</p>`;
+            notesDiv.scrollTop = notesDiv.scrollHeight;
+        }
+
+        function updateStatus(data) {
+            const nextName = data.next_speaker === 'DONE'? 'None' : NAMES[data.next_speaker];
+            document.getElementById('status').innerText = `Round: ${data.round} / ${data.max_rounds} `;
+        }
+
+        function showUserInput() { document.getElementById('user-input').style.display = 'block'; }
+        function hideUserInput() { document.getElementById('user-input').style.display = 'none'; }
+
+        async function toggleCamera() {
+            const video = document.getElementById('user-video');
+            const avatar = document.getElementById('user-avatar');
+            const btn = document.getElementById('camera-btn');
+            
+            // Zoom ON icon - camera only, no slash
+            const cameraOnSVG = `<svg width="20" height="20" viewBox="0 0 24 24" fill="none"><path d="M23 7l-7 5 7 5V7z" stroke="white" stroke-width="2" stroke-linejoin="round"/><rect x="1" y="5" width="15" height="14" rx="2" stroke="white" stroke-width="2"/></svg>`;
+            
+            // Zoom OFF icon - camera with diagonal slash
+            const cameraOffSVG = `<svg width="20" height="20" viewBox="0 0 24 24" fill="none"><path d="M23 7l-7 5 7 5V7z" stroke="white" stroke-width="2" stroke-linejoin="round"/><rect x="1" y="5" width="15" height="14" rx="2" stroke="white" stroke-width="2"/><line x1="1" y1="1" x2="23" y2="23" stroke="white" stroke-width="2"/></svg>`;
+
+            if (!cameraOn) {
+                userStream = await navigator.mediaDevices.getUserMedia({ video: true });
+                video.srcObject = userStream; 
+                video.style.display = 'block'; 
+                avatar.style.display = 'none';
+                btn.innerHTML = cameraOnSVG; // <-- REMOVED <span>Video On</span>
+                btn.className = 'zoom-btn video-on';
+                cameraOn = true;
+            } else {
+                userStream.getTracks().forEach(track => track.stop());
+                video.style.display = 'none'; 
+                avatar.style.display = 'flex';
+                btn.innerHTML = cameraOffSVG; // <-- REMOVED <span>Video Off</span>
+                btn.className = 'zoom-btn video-off';
+                cameraOn = false;
+            }
+        }
+
+        function toggleMic() {
+            const btn = document.getElementById('mic-btn');
+            
+            // MIC ON = no slash, green
+            const micOnSVG = `<svg width="20" height="20" viewBox="0 0 24 24" fill="none"><path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z" stroke="white" stroke-width="2"/><path d="M19 10v2a7 7 0 0 1-14 0v-2" stroke="white" stroke-width="2"/><line x1="12" y1="19" x2="12" y2="23" stroke="white" stroke-width="2"/><line x1="8" y1="23" x2="16" y2="23" stroke="white" stroke-width="2"/></svg>`;
+            
+            // MIC OFF = with slash, red 
+            const micOffSVG = `<svg width="20" height="20" viewBox="0 0 24 24" fill="none"><path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z" stroke="white" stroke-width="2"/><path d="M19 10v2a7 7 0 0 1-14 0v-2" stroke="white" stroke-width="2"/><line x1="12" y1="19" x2="12" y2="23" stroke="white" stroke-width="2"/><line x1="8" y1="23" x2="16" y2="23" stroke="white" stroke-width="2"/><line x1="1" y1="1" x2="23" y2="23" stroke="white" stroke-width="2"/></svg>`;
+
+            if (!micOn) {
+                // TURN MIC ON
+                if (!recognition) {
+                    recognition = new (window.SpeechRecognition || window.webkitSpeechRecognition)();
+                    recognition.lang = 'en-US'; 
+                    recognition.continuous = true;
+                    recognition.interimResults = true;
+                    recognition.onresult = (event) => {
+                        for (let i = event.resultIndex; i < event.results.length; ++i) {
+                            if (event.results[i].isFinal) {
+                                finalTranscript += event.results[i][0].transcript + " ";
+                            }
+                        }
+                    };
+                    recognition.onend = () => { isRecording = false; };
+                    recognition.onerror = () => { isRecording = false; };
+                }
+                finalTranscript = "";
+                recognition.start(); 
+                isRecording = true;
+                
+                btn.innerHTML = micOnSVG;
+                btn.className = 'zoom-btn mic-on'; // green
+                micOn = true;
+                
+            } else {
+                // TURN MIC OFF
+                if(recognition) recognition.stop();
+                isRecording = false;
+                
+                if(finalTranscript.trim()!== ""){
+                    sendUserMessage(finalTranscript);
+                    finalTranscript = "";
+                }
+                
+                btn.innerHTML = micOffSVG;
+                btn.className = 'zoom-btn mic-off'; // red
+                micOn = false;
+            }
+        }
+
+        async function sendUserMessage(message) {
+            updateNotes('user', message);
+            const response = await fetch('/chat', {
+                method: 'POST', headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({message: message})
+            });
+            const data = await response.json();
+            handleTurn(data);
+        }
+    </script>
+</body>
+</html>
